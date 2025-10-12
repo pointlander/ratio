@@ -28,7 +28,7 @@ const (
 	// B2 exponential decay rate for the second-moment estimates
 	B2 = 0.89
 	// Eta is the learning rate
-	Eta = 1.0e-1
+	Eta = 1.0e-2
 )
 
 const (
@@ -149,7 +149,7 @@ func main() {
 		}
 	}
 
-	for iteration := range 128 {
+	for iteration := range 1024 {
 		pow := func(x float64) float64 {
 			y := math.Pow(x, float64(iteration+1))
 			if math.IsNaN(y) || math.IsInf(y, 0) {
