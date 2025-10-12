@@ -13,8 +13,11 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/pointlander/ratio/kmeans"
 
 	"github.com/pointlander/gradient/tf64"
 )
@@ -196,11 +199,57 @@ func main() {
 			}
 		}
 	}
+	embedding := make([][]float64, 150)
 	y := set.ByName["y"]
 	for i := range len(iris) {
 		for ii := range 4 {
-			fmt.Printf("%f ", y.X[i*4+ii])
+			value := y.X[i*4+ii]
+			fmt.Printf("%f ", value)
+			embedding[i] = append(embedding[i], value)
 		}
 		fmt.Println()
+	}
+	meta := make([][]float64, len(iris))
+	for i := range meta {
+		meta[i] = make([]float64, len(iris))
+	}
+	const k = 3
+	for i := 0; i < 33; i++ {
+		clusters, _, err := kmeans.Kmeans(int64(i+1), embedding, k, kmeans.SquaredEuclideanDistance, -1)
+		if err != nil {
+			panic(err)
+		}
+		for i := 0; i < len(meta); i++ {
+			target := clusters[i]
+			for j, v := range clusters {
+				if v == target {
+					meta[i][j]++
+				}
+			}
+		}
+	}
+	clusters, _, err := kmeans.Kmeans(1, meta, k, kmeans.SquaredEuclideanDistance, -1)
+	if err != nil {
+		panic(err)
+	}
+	for i, value := range clusters {
+		iris[i].Cluster = value
+	}
+
+	sort.Slice(iris, func(i, j int) bool {
+		return iris[i].Cluster < iris[j].Cluster
+	})
+	for _, value := range iris {
+		fmt.Println(value.Cluster, value.Label)
+	}
+
+	a := make(map[string][3]int)
+	for i := range iris {
+		histogram := a[iris[i].Label]
+		histogram[iris[i].Cluster]++
+		a[iris[i].Label] = histogram
+	}
+	for k, v := range a {
+		fmt.Println(k, v)
 	}
 }
