@@ -149,6 +149,10 @@ func main() {
 		}
 	}
 
+	dropout := map[string]interface{}{
+		"rng": rng,
+	}
+
 	for iteration := range 1024 {
 		pow := func(x float64) float64 {
 			y := math.Pow(x, float64(iteration+1))
@@ -158,7 +162,7 @@ func main() {
 			return y
 		}
 		sum := tf64.Add(others.Get("x"), set.Get("y"))
-		l1 := tf64.T(tf64.Mul(tf64.Mul(sum, sum), tf64.T(sum)))
+		l1 := tf64.T(tf64.Mul(tf64.Dropout(tf64.Mul(sum, sum), dropout), tf64.T(sum)))
 		loss := tf64.Avg(tf64.Quadratic(l1, set.Get("y")))
 
 		l := 0.0
