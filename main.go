@@ -7,8 +7,10 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"compress/bzip2"
 	"embed"
 	"encoding/csv"
+	"flag"
 	"fmt"
 	"io"
 	"math"
@@ -115,7 +117,53 @@ func Load() []Fisher {
 	return fisher
 }
 
-func main() {
+//go:embed books/*
+var Text embed.FS
+
+const (
+	order = 4
+)
+
+type Markov [order]byte
+type Model [order]map[Markov][]uint32
+
+// Lookup looks a vector up
+func Lookup(markov *[order]Markov, model *Model) []float32 {
+	for i := range markov {
+		i = order - 1 - i
+		vector := model[i][markov[i]]
+		if vector != nil {
+			sum := float32(0.0)
+			for _, value := range vector {
+				sum += float32(value)
+			}
+			result := make([]float32, len(vector))
+			for ii, value := range vector {
+				result[ii] = float32(value) / sum
+			}
+			return result
+		}
+	}
+	return nil
+}
+
+// Iterate iterates a markov model
+func Iterate(markov *[order]Markov, state byte) {
+	for i := range markov {
+		state := state
+		for ii, value := range markov[i][:i+1] {
+			markov[i][ii], state = state, value
+		}
+	}
+}
+
+var (
+	// FlagCluster cluster mode
+	FlagCluster = flag.Bool("c", false, "cluster mode")
+)
+
+// ClusterMode
+func ClusterMode() {
 	rng := rand.New(rand.NewSource(1))
 	iris := Load()
 	others := tf64.NewSet()
@@ -258,4 +306,97 @@ func main() {
 	for k, v := range a {
 		fmt.Println(k, v)
 	}
+}
+
+func main() {
+	flag.Parse()
+
+	if *FlagCluster {
+		ClusterMode()
+		return
+	}
+
+	rng := rand.New(rand.NewSource(1))
+
+	const (
+		size = 256
+	)
+
+	type File struct {
+		Name  string
+		Data  []byte
+		Model Model
+	}
+
+	files := []File{
+		{Name: "pg74.txt.bz2"},
+		{Name: "10.txt.utf-8.bz2"},
+		{Name: "76.txt.utf-8.bz2"},
+		{Name: "84.txt.utf-8.bz2"},
+		{Name: "100.txt.utf-8.bz2"},
+		{Name: "1837.txt.utf-8.bz2"},
+		{Name: "2701.txt.utf-8.bz2"},
+		{Name: "3176.txt.utf-8.bz2"},
+	}
+
+	load := func(book *File) {
+		path := fmt.Sprintf("books/%s", book.Name)
+		file, err := Text.Open(path)
+		if err != nil {
+			panic(err)
+		}
+		defer file.Close()
+		breader := bzip2.NewReader(file)
+		data, err := io.ReadAll(breader)
+		if err != nil {
+			panic(err)
+		}
+
+		markov := [order]Markov{}
+		for i := range book.Model {
+			book.Model[i] = make(map[Markov][]uint32)
+		}
+		for _, value := range data {
+			for ii := range markov {
+				vector := book.Model[ii][markov[ii]]
+				if vector == nil {
+					vector = make([]uint32, size)
+				}
+				vector[value]++
+				book.Model[ii][markov[ii]] = vector
+
+				state := value
+				for iii, value := range markov[ii][:ii+1] {
+					markov[ii][iii], state = state, value
+				}
+			}
+		}
+		book.Data = data
+	}
+	for i := range files {
+		load(&files[i])
+		fmt.Println(files[i].Name)
+		for ii := range files[i].Model {
+			fmt.Println(len(files[i].Model[ii]))
+		}
+	}
+
+	var markov [order]Markov
+	str := []byte("What is the meaning of life?")
+	for _, value := range str {
+		Iterate(&markov, value)
+	}
+	for range 128 {
+		distribution := Lookup(&markov, &files[1].Model)
+		sum, selected := float32(0.0), rng.Float32()
+		for key, value := range distribution {
+			sum += value
+			if selected < sum {
+				str = append(str, byte(key))
+				Iterate(&markov, byte(key))
+				break
+			}
+		}
+	}
+	fmt.Println(string(str))
 }
