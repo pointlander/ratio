@@ -149,8 +149,10 @@ func main() {
 		}
 	}
 
+	drop := .7
 	dropout := map[string]interface{}{
-		"rng": rng,
+		"rng":  rng,
+		"drop": &drop,
 	}
 
 	for iteration := range 1024 {
