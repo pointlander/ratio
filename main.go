@@ -382,7 +382,7 @@ func main() {
 	}
 
 	str := []byte("What is the meaning of life?")
-	length := len(str) + 128
+	length := len(str) //+ 128
 	set := tf64.NewSet()
 	set.Add("y", 256, length)
 	set.Add("x", 256, length)
@@ -396,7 +396,7 @@ func main() {
 			x.X = append(x.X, float64(value))
 		}
 	}
-	for range 128 {
+	/*for range 128 {
 		distribution := Lookup(&markov, &files[1].Model)
 		sum, selected := float32(0.0), rng.Float32()
 		for key, value := range distribution {
@@ -411,7 +411,7 @@ func main() {
 				break
 			}
 		}
-	}
+	}*/
 
 	for i := range set.Weights {
 		w := set.Weights[i]
@@ -437,7 +437,7 @@ func main() {
 		"rng": rng,
 	}
 
-	for iteration := range 1024 {
+	for iteration := range 128 {
 		pow := func(x float64) float64 {
 			y := math.Pow(x, float64(iteration+1))
 			if math.IsNaN(y) || math.IsInf(y, 0) {
@@ -445,9 +445,10 @@ func main() {
 			}
 			return y
 		}
-		sum := tf64.Add(set.Get("x"), set.Get("y"))
+		xx := tf64.Softmax(set.Get("x"))
+		sum := tf64.Add(xx, set.Get("y"))
 		l1 := tf64.T(tf64.Mul(tf64.Dropout(tf64.Mul(sum, sum), dropout), tf64.T(sum)))
-		loss := tf64.Add(tf64.Avg(tf64.Quadratic(l1, set.Get("y"))), tf64.Avg(tf64.Quadratic(l1, set.Get("x"))))
+		loss := tf64.Add(tf64.Avg(tf64.Quadratic(l1, set.Get("y"))), tf64.Avg(tf64.Quadratic(l1, xx)))
 
 		l := 0.0
 		set.Zero()
@@ -456,7 +457,7 @@ func main() {
 			fmt.Println(iteration, l)
 			return
 		}
-		fmt.Println(l)
+		fmt.Println(iteration, l)
 
 		norm := 0.0
 		for _, p := range set.Weights {
@@ -472,7 +473,7 @@ func main() {
 		}
 		const Eta = 1.0e-3
 		for _, w := range set.Weights {
-			if strings.HasPrefix(w.N, "x") {
+			/*if strings.HasPrefix(w.N, "x") {
 				for ii, d := range w.D[len(str):] {
 					ii += len(str)
 					g := d * scaling
@@ -488,7 +489,7 @@ func main() {
 					w.X[ii] -= Eta * mhat / (math.Sqrt(vhat) + 1e-8)
 				}
 				continue
-			}
+			}*/
 			for ii, d := range w.D {
 				g := d * scaling
 				m := B1*w.States[StateM][ii] + (1-B1)*g
@@ -505,7 +506,7 @@ func main() {
 		}
 	}
 
-	cs := func(a []float32, b []float64) float64 {
+	/*cs := func(a []float32, b []float64) float64 {
 		ab, aa, bb := 0.0, 0.0, 0.0
 		for key, value := range a {
 			ab += float64(value) * b[key]
@@ -523,10 +524,46 @@ func main() {
 			return 0
 		}
 		return ab / (math.Sqrt(aa) * math.Sqrt(bb))
+	}*/
+	const (
+		// S is the scaling factor for the softmax
+		S = 1.0 - 1e-300
+	)
+
+	softmax := func(values []float64) {
+		max := 0.0
+		for _, v := range values {
+			if v > max {
+				max = v
+			}
+		}
+		s := max * S
+		sum := 0.0
+		for j, value := range values {
+			values[j] = math.Exp(value - s)
+			sum += values[j]
+		}
+		for j, value := range values {
+			values[j] = value / sum
+		}
+	}
+
+	stri := []byte{}
+	for i := range length {
+		xx := x.X[i*256 : (i+1)*256]
+		softmax(xx)
+		total, selected := 0.0, rng.Float64()
+		for key, value := range xx {
+			total += value
+			if selected < total {
+				stri = append(stri, byte(key))
+				break
+			}
+		}
 	}
 
 	fmt.Println(string(str))
-	stri := []byte("What is the meaning of life?")
+	/*stri := []byte("What is the meaning of life?")
 	{
 		var markov [order]Markov
 		for _, value := range stri {
@@ -563,6 +600,6 @@ func main() {
 			}
 			index++
 		}
-	}
+	}*/
 	fmt.Println(string(stri))
 }
