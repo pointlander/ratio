@@ -447,7 +447,7 @@ func main() {
 		}
 		sum := tf64.Add(set.Get("x"), set.Get("y"))
 		l1 := tf64.T(tf64.Mul(tf64.Dropout(tf64.Mul(sum, sum), dropout), tf64.T(sum)))
-		loss := tf64.Avg(tf64.Quadratic(l1, set.Get("y")))
+		loss := tf64.Add(tf64.Avg(tf64.Quadratic(l1, set.Get("y"))), tf64.Avg(tf64.Quadratic(l1, set.Get("x"))))
 
 		l := 0.0
 		set.Zero()
