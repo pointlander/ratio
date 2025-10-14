@@ -529,7 +529,7 @@ func main() {
 	stri := []byte("What is the meaning of life?")
 	{
 		var markov [order]Markov
-		for _, value := range str {
+		for _, value := range stri {
 			Iterate(&markov, value)
 		}
 		index := len(stri)
