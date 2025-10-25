@@ -445,11 +445,11 @@ func main() {
 		dropout := map[string]interface{}{
 			"rng": rng,
 		}
-		sum := tf64.Add(tf64.Softmax(others.Get("x")), set.Get("y"))
+		sum := tf64.Add(others.Get("x"), set.Get("y"))
 		l1 := tf64.T(tf64.Mul(tf64.Dropout(tf64.Mul(sum, sum), dropout), tf64.T(sum)))
 		loss := tf64.Avg(tf64.Quadratic(l1, set.Get("y")))
 
-		for iteration := range 128 {
+		for iteration := range 256 {
 			pow := func(x float64) float64 {
 				y := math.Pow(x, float64(iteration+1))
 				if math.IsNaN(y) || math.IsInf(y, 0) {
@@ -459,6 +459,7 @@ func main() {
 			}
 
 			l := 0.0
+			others.Zero()
 			set.Zero()
 			l = tf64.Gradient(loss).X[0]
 			if math.IsNaN(float64(l)) || math.IsInf(float64(l), 0) {
