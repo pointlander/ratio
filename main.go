@@ -381,162 +381,171 @@ func main() {
 		}
 	}
 
-	type String struct {
-		String  string
-		Entropy float64
-	}
-	results := make([]String, 16)
-	const step = 33
-	for i := range results {
-		str := []byte("What is the meaning of life?")
-		length := len(str) + step
-		others := tf64.NewSet()
-		others.Add("x", 256, length)
-		x := others.ByName["x"]
-
-		set := tf64.NewSet()
-		set.Add("y", 256, length)
-
-		var markov [order]Markov
-		for _, value := range str {
-			Iterate(&markov, value)
-			distribution := Lookup(&markov, &files[1].Model)
-			for _, value := range distribution {
-				x.X = append(x.X, float64(value))
-			}
+	str := []byte("What is the meaning of life?")
+	process := func(str []byte) []byte {
+		type String struct {
+			String  []byte
+			Entropy float64
 		}
-		for range step {
-			distribution := Lookup(&markov, &files[1].Model)
-			sum, selected := float32(0.0), rng.Float32()
-			for key, value := range distribution {
-				sum += value
-				if selected < sum {
-					str = append(str, byte(key))
-					Iterate(&markov, byte(key))
-					distribution := Lookup(&markov, &files[1].Model)
-					for _, value := range distribution {
-						x.X = append(x.X, float64(value))
-					}
-					break
+		results := make([]String, 128)
+		const step = 33
+		for i := range results {
+			cp := make([]byte, len(str))
+			copy(cp, str)
+			length := len(cp) + step
+			others := tf64.NewSet()
+			others.Add("x", 256, length)
+			x := others.ByName["x"]
+
+			set := tf64.NewSet()
+			set.Add("y", 256, length)
+
+			var markov [order]Markov
+			for _, value := range cp {
+				Iterate(&markov, value)
+				distribution := Lookup(&markov, &files[1].Model)
+				for _, value := range distribution {
+					x.X = append(x.X, float64(value))
 				}
 			}
-		}
-		results[i].String = string(str)
+			for range step {
+				distribution := Lookup(&markov, &files[1].Model)
+				sum, selected := float32(0.0), rng.Float32()
+				for key, value := range distribution {
+					sum += value
+					if selected < sum {
+						cp = append(cp, byte(key))
+						Iterate(&markov, byte(key))
+						distribution := Lookup(&markov, &files[1].Model)
+						for _, value := range distribution {
+							x.X = append(x.X, float64(value))
+						}
+						break
+					}
+				}
+			}
+			results[i].String = cp
 
-		for i := range set.Weights {
-			w := set.Weights[i]
-			if strings.HasPrefix(w.N, "b") || strings.HasPrefix(w.N, "x") {
-				w.X = w.X[:cap(w.X)]
+			for i := range set.Weights {
+				w := set.Weights[i]
+				if strings.HasPrefix(w.N, "b") || strings.HasPrefix(w.N, "x") {
+					w.X = w.X[:cap(w.X)]
+					w.States = make([][]float64, StateTotal)
+					for ii := range w.States {
+						w.States[ii] = make([]float64, len(w.X))
+					}
+					continue
+				}
+				factor := math.Sqrt(2.0 / float64(w.S[0]))
+				for range cap(w.X) {
+					w.X = append(w.X, rng.NormFloat64()*factor)
+				}
 				w.States = make([][]float64, StateTotal)
 				for ii := range w.States {
 					w.States[ii] = make([]float64, len(w.X))
 				}
-				continue
-			}
-			factor := math.Sqrt(2.0 / float64(w.S[0]))
-			for range cap(w.X) {
-				w.X = append(w.X, rng.NormFloat64()*factor)
-			}
-			w.States = make([][]float64, StateTotal)
-			for ii := range w.States {
-				w.States[ii] = make([]float64, len(w.X))
-			}
-		}
-
-		dropout := map[string]interface{}{
-			"rng": rng,
-		}
-		sum := tf64.Add(others.Get("x"), set.Get("y"))
-		l1 := tf64.T(tf64.Mul(tf64.Dropout(tf64.Mul(sum, sum), dropout), tf64.T(sum)))
-		loss := tf64.Avg(tf64.Quadratic(l1, set.Get("y")))
-
-		for iteration := range 256 {
-			pow := func(x float64) float64 {
-				y := math.Pow(x, float64(iteration+1))
-				if math.IsNaN(y) || math.IsInf(y, 0) {
-					return 0
-				}
-				return y
 			}
 
-			l := 0.0
-			others.Zero()
-			set.Zero()
-			l = tf64.Gradient(loss).X[0]
-			if math.IsNaN(float64(l)) || math.IsInf(float64(l), 0) {
-				fmt.Println(iteration, l)
-				return
+			dropout := map[string]interface{}{
+				"rng": rng,
 			}
-			fmt.Println(iteration, l)
+			sum := tf64.Add(others.Get("x"), set.Get("y"))
+			l1 := tf64.T(tf64.Mul(tf64.Dropout(tf64.Mul(sum, sum), dropout), tf64.T(sum)))
+			loss := tf64.Avg(tf64.Quadratic(l1, set.Get("y")))
 
-			norm := 0.0
-			for _, p := range set.Weights {
-				for _, d := range p.D {
-					norm += d * d
-				}
-			}
-			norm = math.Sqrt(norm)
-			b1, b2 := pow(B1), pow(B2)
-			scaling := 1.0
-			if norm > 1 {
-				scaling = 1 / norm
-			}
-			const Eta = 1.0e-3
-			for _, w := range set.Weights {
-				for ii, d := range w.D {
-					g := d * scaling
-					m := B1*w.States[StateM][ii] + (1-B1)*g
-					v := B2*w.States[StateV][ii] + (1-B2)*g*g
-					w.States[StateM][ii] = m
-					w.States[StateV][ii] = v
-					mhat := m / (1 - b1)
-					vhat := v / (1 - b2)
-					if vhat < 0 {
-						vhat = 0
+			for iteration := range 256 {
+				pow := func(x float64) float64 {
+					y := math.Pow(x, float64(iteration+1))
+					if math.IsNaN(y) || math.IsInf(y, 0) {
+						return 0
 					}
-					w.X[ii] -= Eta * mhat / (math.Sqrt(vhat) + 1e-8)
+					return y
+				}
+
+				l := 0.0
+				others.Zero()
+				set.Zero()
+				l = tf64.Gradient(loss).X[0]
+				if math.IsNaN(float64(l)) || math.IsInf(float64(l), 0) {
+					fmt.Println(iteration, l)
+					panic("isnan or isinf")
+				}
+				//fmt.Println(iteration, l)
+
+				norm := 0.0
+				for _, p := range set.Weights {
+					for _, d := range p.D {
+						norm += d * d
+					}
+				}
+				norm = math.Sqrt(norm)
+				b1, b2 := pow(B1), pow(B2)
+				scaling := 1.0
+				if norm > 1 {
+					scaling = 1 / norm
+				}
+				const Eta = 1.0e-3
+				for _, w := range set.Weights {
+					for ii, d := range w.D {
+						g := d * scaling
+						m := B1*w.States[StateM][ii] + (1-B1)*g
+						v := B2*w.States[StateV][ii] + (1-B2)*g*g
+						w.States[StateM][ii] = m
+						w.States[StateV][ii] = v
+						mhat := m / (1 - b1)
+						vhat := v / (1 - b2)
+						if vhat < 0 {
+							vhat = 0
+						}
+						w.X[ii] -= Eta * mhat / (math.Sqrt(vhat) + 1e-8)
+					}
 				}
 			}
-		}
 
-		const (
-			// S is the scaling factor for the softmax
-			S = 1.0 - 1e-300
-		)
+			const (
+				// S is the scaling factor for the softmax
+				S = 1.0 - 1e-300
+			)
 
-		softmax := func(values []float64) {
-			max := 0.0
-			for _, v := range values {
-				if v > max {
-					max = v
+			softmax := func(values []float64) {
+				max := 0.0
+				for _, v := range values {
+					if v > max {
+						max = v
+					}
+				}
+				s := max * S
+				sum := 0.0
+				for j, value := range values {
+					values[j] = math.Exp(value - s)
+					sum += values[j]
+				}
+				for j, value := range values {
+					values[j] = value / sum
 				}
 			}
-			s := max * S
-			sum := 0.0
-			for j, value := range values {
-				values[j] = math.Exp(value - s)
-				sum += values[j]
+			y := set.ByName["y"]
+			for ii := range length {
+				yy := y.X[ii*256 : (ii+1)*256]
+				softmax(yy)
+				entropy := 0.0
+				for _, value := range yy {
+					entropy += value * math.Log2(value)
+				}
+				results[i].Entropy += -entropy
 			}
-			for j, value := range values {
-				values[j] = value / sum
-			}
+			fmt.Println("string", i, results[i].Entropy)
 		}
-		y := set.ByName["y"]
-		for ii := range length {
-			yy := y.X[ii*256 : (ii+1)*256]
-			softmax(yy)
-			entropy := 0.0
-			for _, value := range yy {
-				entropy += value * math.Log2(value)
-			}
-			results[i].Entropy += -entropy
-		}
-		fmt.Println("string", i, results[i].Entropy)
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].Entropy > results[j].Entropy
+		})
+		/*for i := range results {
+			fmt.Println(results[i].Entropy, results[i].String)
+		}*/
+		return results[0].String
 	}
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Entropy > results[j].Entropy
-	})
-	for i := range results {
-		fmt.Println(results[i].Entropy, results[i].String)
+	for range 3 {
+		str = process(str)
 	}
+	fmt.Println(string(str))
 }
