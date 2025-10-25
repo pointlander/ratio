@@ -381,6 +381,7 @@ func main() {
 		}
 	}
 
+	const model = 1
 	str := []byte("What is the meaning of life?")
 	process := func(str []byte) []byte {
 		type String struct {
@@ -403,20 +404,20 @@ func main() {
 			var markov [order]Markov
 			for _, value := range cp {
 				Iterate(&markov, value)
-				distribution := Lookup(&markov, &files[1].Model)
+				distribution := Lookup(&markov, &files[model].Model)
 				for _, value := range distribution {
 					x.X = append(x.X, float64(value))
 				}
 			}
 			for range step {
-				distribution := Lookup(&markov, &files[1].Model)
+				distribution := Lookup(&markov, &files[model].Model)
 				sum, selected := float32(0.0), rng.Float32()
 				for key, value := range distribution {
 					sum += value
 					if selected < sum {
 						cp = append(cp, byte(key))
 						Iterate(&markov, byte(key))
-						distribution := Lookup(&markov, &files[1].Model)
+						distribution := Lookup(&markov, &files[model].Model)
 						for _, value := range distribution {
 							x.X = append(x.X, float64(value))
 						}
