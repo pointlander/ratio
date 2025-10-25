@@ -386,9 +386,10 @@ func main() {
 		Entropy float64
 	}
 	results := make([]String, 16)
+	const step = 33
 	for i := range results {
 		str := []byte("What is the meaning of life?")
-		length := len(str) + 16
+		length := len(str) + step
 		others := tf64.NewSet()
 		others.Add("x", 256, length)
 		x := others.ByName["x"]
@@ -404,7 +405,7 @@ func main() {
 				x.X = append(x.X, float64(value))
 			}
 		}
-		for range 16 {
+		for range step {
 			distribution := Lookup(&markov, &files[1].Model)
 			sum, selected := float32(0.0), rng.Float32()
 			for key, value := range distribution {
