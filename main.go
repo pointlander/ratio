@@ -21,6 +21,7 @@ import (
 
 	"github.com/pointlander/ratio/kmeans"
 
+	"github.com/pointlander/gradient/tf32"
 	"github.com/pointlander/gradient/tf64"
 )
 
@@ -394,11 +395,11 @@ func main() {
 			cp := make([]byte, len(str))
 			copy(cp, str)
 			length := len(cp) + step
-			others := tf64.NewSet()
+			others := tf32.NewSet()
 			others.Add("x", 256, length)
 			x := others.ByName["x"]
 
-			set := tf64.NewSet()
+			set := tf32.NewSet()
 			set.Add("y", 256, length)
 
 			var markov [order]Markov
@@ -406,7 +407,7 @@ func main() {
 				Iterate(&markov, value)
 				distribution := Lookup(&markov, &files[model].Model)
 				for _, value := range distribution {
-					x.X = append(x.X, float64(value))
+					x.X = append(x.X, value)
 				}
 			}
 			for range step {
@@ -419,7 +420,7 @@ func main() {
 						Iterate(&markov, byte(key))
 						distribution := Lookup(&markov, &files[model].Model)
 						for _, value := range distribution {
-							x.X = append(x.X, float64(value))
+							x.X = append(x.X, value)
 						}
 						break
 					}
@@ -431,28 +432,28 @@ func main() {
 				w := set.Weights[i]
 				if strings.HasPrefix(w.N, "b") || strings.HasPrefix(w.N, "x") {
 					w.X = w.X[:cap(w.X)]
-					w.States = make([][]float64, StateTotal)
+					w.States = make([][]float32, StateTotal)
 					for ii := range w.States {
-						w.States[ii] = make([]float64, len(w.X))
+						w.States[ii] = make([]float32, len(w.X))
 					}
 					continue
 				}
 				factor := math.Sqrt(2.0 / float64(w.S[0]))
 				for range cap(w.X) {
-					w.X = append(w.X, rng.NormFloat64()*factor)
+					w.X = append(w.X, float32(rng.NormFloat64()*factor))
 				}
-				w.States = make([][]float64, StateTotal)
+				w.States = make([][]float32, StateTotal)
 				for ii := range w.States {
-					w.States[ii] = make([]float64, len(w.X))
+					w.States[ii] = make([]float32, len(w.X))
 				}
 			}
 
 			dropout := map[string]interface{}{
 				"rng": rng,
 			}
-			sum := tf64.Add(others.Get("x"), set.Get("y"))
-			l1 := tf64.T(tf64.Mul(tf64.Dropout(tf64.Mul(sum, sum), dropout), tf64.T(sum)))
-			loss := tf64.Avg(tf64.Quadratic(l1, set.Get("y")))
+			sum := tf32.Add(others.Get("x"), set.Get("y"))
+			l1 := tf32.T(tf32.Mul(tf32.Dropout(tf32.Mul(sum, sum), dropout), tf32.T(sum)))
+			loss := tf32.Avg(tf32.Quadratic(l1, set.Get("y")))
 
 			for iteration := range 256 {
 				pow := func(x float64) float64 {
@@ -463,10 +464,10 @@ func main() {
 					return y
 				}
 
-				l := 0.0
+				l := float32(0.0)
 				others.Zero()
 				set.Zero()
-				l = tf64.Gradient(loss).X[0]
+				l = tf32.Gradient(loss).X[0]
 				if math.IsNaN(float64(l)) || math.IsInf(float64(l), 0) {
 					fmt.Println(iteration, l)
 					panic("isnan or isinf")
@@ -476,7 +477,7 @@ func main() {
 				norm := 0.0
 				for _, p := range set.Weights {
 					for _, d := range p.D {
-						norm += d * d
+						norm += float64(d * d)
 					}
 				}
 				norm = math.Sqrt(norm)
@@ -488,17 +489,17 @@ func main() {
 				const Eta = 1.0e-3
 				for _, w := range set.Weights {
 					for ii, d := range w.D {
-						g := d * scaling
+						g := d * float32(scaling)
 						m := B1*w.States[StateM][ii] + (1-B1)*g
 						v := B2*w.States[StateV][ii] + (1-B2)*g*g
 						w.States[StateM][ii] = m
 						w.States[StateV][ii] = v
-						mhat := m / (1 - b1)
-						vhat := v / (1 - b2)
+						mhat := m / float32(1-b1)
+						vhat := v / float32(1-b2)
 						if vhat < 0 {
 							vhat = 0
 						}
-						w.X[ii] -= Eta * mhat / (math.Sqrt(vhat) + 1e-8)
+						w.X[ii] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
 					}
 				}
 			}
@@ -508,17 +509,17 @@ func main() {
 				S = 1.0 - 1e-300
 			)
 
-			softmax := func(values []float64) {
-				max := 0.0
+			softmax := func(values []float32) {
+				max := float32(0.0)
 				for _, v := range values {
 					if v > max {
 						max = v
 					}
 				}
 				s := max * S
-				sum := 0.0
+				sum := float32(0.0)
 				for j, value := range values {
-					values[j] = math.Exp(value - s)
+					values[j] = float32(math.Exp(float64(value - s)))
 					sum += values[j]
 				}
 				for j, value := range values {
@@ -531,7 +532,7 @@ func main() {
 				softmax(yy)
 				entropy := 0.0
 				for _, value := range yy {
-					entropy += value * math.Log2(value)
+					entropy += float64(value) * math.Log2(float64(value))
 				}
 				results[i].Entropy += -entropy
 			}
