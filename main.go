@@ -15,6 +15,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -384,6 +385,7 @@ func main() {
 
 	const model = 4
 	str := []byte("What is the meaning of life?")
+	done := make(chan bool, 8)
 	process := func(str []byte) []byte {
 		type String struct {
 			String  []byte
@@ -391,7 +393,7 @@ func main() {
 		}
 		results := make([]String, 256)
 		const step = 16
-		for i := range results {
+		process := func(seed int64, i int, str []byte) {
 			cp := make([]byte, len(str))
 			copy(cp, str)
 			length := len(cp) + step
@@ -537,7 +539,26 @@ func main() {
 				results[i].Entropy += -entropy
 			}
 			fmt.Println("string", i, results[i].Entropy)
+			done <- true
 		}
+		index, flight, cpus := 0, 0, runtime.NumCPU()
+		for index < len(results) && flight < cpus {
+			go process(rng.Int63(), index, str)
+			index++
+			flight++
+		}
+		for index < len(results) {
+			<-done
+			flight--
+
+			go process(rng.Int63(), index, str)
+			index++
+			flight++
+		}
+		for range flight {
+			<-done
+		}
+
 		sort.Slice(results, func(i, j int) bool {
 			return results[i].Entropy > results[j].Entropy
 		})
