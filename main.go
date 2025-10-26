@@ -381,15 +381,15 @@ func main() {
 		}
 	}
 
-	const model = 1
+	const model = 4
 	str := []byte("What is the meaning of life?")
 	process := func(str []byte) []byte {
 		type String struct {
 			String  []byte
 			Entropy float64
 		}
-		results := make([]String, 128)
-		const step = 33
+		results := make([]String, 256)
+		const step = 16
 		for i := range results {
 			cp := make([]byte, len(str))
 			copy(cp, str)
