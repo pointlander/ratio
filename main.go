@@ -321,8 +321,40 @@ func main() {
 	rng := rand.New(rand.NewSource(1))
 
 	const (
-		size = 256
+		size  = 256
+		step  = 16
+		model = 4
+		Eta   = 1.0e-3
 	)
+
+	const (
+		// S is the scaling factor for the softmax
+		S = 1.0 - 1e-300
+	)
+
+	softmax := func(values []float32) {
+		max := float32(0.0)
+		for i, v := range values {
+			if v < 0 {
+				v = -v
+			}
+			values[i] = v
+		}
+		for _, v := range values {
+			if v > max {
+				max = v
+			}
+		}
+		s := max * S
+		sum := float32(0.0)
+		for j, value := range values {
+			values[j] = float32(math.Exp(float64(value - s)))
+			sum += values[j]
+		}
+		for j, value := range values {
+			values[j] = value / sum
+		}
+	}
 
 	type File struct {
 		Name  string
@@ -383,16 +415,14 @@ func main() {
 		}
 	}
 
-	const model = 4
 	str := []byte("What is the meaning of life?")
-	done := make(chan bool, 8)
 	process := func(str []byte) []byte {
 		type String struct {
 			String  []byte
 			Entropy float64
 		}
 		results := make([]String, 256)
-		const step = 16
+		done := make(chan bool, 8)
 		process := func(seed int64, i int, str []byte) {
 			rng := rand.New(rand.NewSource(seed))
 			cp := make([]byte, len(str))
@@ -489,7 +519,6 @@ func main() {
 				if norm > 1 {
 					scaling = 1 / norm
 				}
-				const Eta = 1.0e-3
 				for _, w := range set.Weights {
 					for ii, d := range w.D {
 						g := d * float32(scaling)
@@ -507,28 +536,6 @@ func main() {
 				}
 			}
 
-			const (
-				// S is the scaling factor for the softmax
-				S = 1.0 - 1e-300
-			)
-
-			softmax := func(values []float32) {
-				max := float32(0.0)
-				for _, v := range values {
-					if v > max {
-						max = v
-					}
-				}
-				s := max * S
-				sum := float32(0.0)
-				for j, value := range values {
-					values[j] = float32(math.Exp(float64(value - s)))
-					sum += values[j]
-				}
-				for j, value := range values {
-					values[j] = value / sum
-				}
-			}
 			y := set.ByName["y"]
 			for ii := range length {
 				yy := y.X[ii*256 : (ii+1)*256]
