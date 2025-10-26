@@ -394,6 +394,7 @@ func main() {
 		results := make([]String, 256)
 		const step = 16
 		process := func(seed int64, i int, str []byte) {
+			rng := rand.New(rand.NewSource(seed))
 			cp := make([]byte, len(str))
 			copy(cp, str)
 			length := len(cp) + step
