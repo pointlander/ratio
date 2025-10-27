@@ -162,6 +162,8 @@ func Iterate(markov *[order]Markov, state byte) {
 var (
 	// FlagCluster cluster mode
 	FlagCluster = flag.Bool("c", false, "cluster mode")
+	// FlagLM langauge model mode
+	FlagLM = flag.Bool("lm", false, "language model mode")
 )
 
 // ClusterMode
@@ -310,14 +312,8 @@ func ClusterMode() {
 	}
 }
 
-func main() {
-	flag.Parse()
-
-	if *FlagCluster {
-		ClusterMode()
-		return
-	}
-
+// LMMode language model mode
+func LMMode() {
 	rng := rand.New(rand.NewSource(1))
 
 	const (
@@ -592,4 +588,18 @@ func main() {
 		str = process(str)
 	}
 	fmt.Println(string(str))
+}
+
+func main() {
+	flag.Parse()
+
+	if *FlagCluster {
+		ClusterMode()
+		return
+	}
+
+	if *FlagLM {
+		LMMode()
+		return
+	}
 }
