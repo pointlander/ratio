@@ -323,7 +323,7 @@ func main() {
 	const (
 		size  = 256
 		step  = 16
-		model = 4
+		model = 8
 		Eta   = 1.0e-3
 	)
 
@@ -371,9 +371,13 @@ func main() {
 		{Name: "1837.txt.utf-8.bz2"},
 		{Name: "2701.txt.utf-8.bz2"},
 		{Name: "3176.txt.utf-8.bz2"},
+		{Name: "all"},
+	}
+	for i := range files[len(files)-1].Model {
+		files[len(files)-1].Model[i] = make(map[Markov][]uint32)
 	}
 
-	load := func(book *File) {
+	load := func(book *File, all *File) {
 		path := fmt.Sprintf("books/%s", book.Name)
 		file, err := Text.Open(path)
 		if err != nil {
@@ -399,6 +403,15 @@ func main() {
 				vector[value]++
 				book.Model[ii][markov[ii]] = vector
 
+				{
+					vector := all.Model[ii][markov[ii]]
+					if vector == nil {
+						vector = make([]uint32, size)
+					}
+					vector[value]++
+					all.Model[ii][markov[ii]] = vector
+				}
+
 				state := value
 				for iii, value := range markov[ii][:ii+1] {
 					markov[ii][iii], state = state, value
@@ -407,8 +420,8 @@ func main() {
 		}
 		book.Data = data
 	}
-	for i := range files {
-		load(&files[i])
+	for i := range files[:len(files)-1] {
+		load(&files[i], &files[len(files)-1])
 		fmt.Println(files[i].Name)
 		for ii := range files[i].Model {
 			fmt.Println(len(files[i].Model[ii]))
