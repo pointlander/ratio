@@ -606,10 +606,11 @@ func main() {
 	rng := rand.New(rand.NewSource(1))
 
 	const (
-		size  = 256
-		step  = 128
-		model = 8
-		Eta   = 1.0e-2
+		size       = 256
+		step       = 128
+		model      = 8
+		Eta        = 1.0e-2
+		population = 128
 	)
 
 	const (
@@ -719,7 +720,7 @@ func main() {
 			String  []byte
 			Entropy float64
 		}
-		results := make([]String, 128)
+		results := make([]String, population)
 		done := make(chan bool, 8)
 		process := func(seed int64, i int, str []byte) {
 			rng := rand.New(rand.NewSource(seed))
@@ -727,11 +728,11 @@ func main() {
 			copy(cp, str)
 			length := len(cp) + step
 			others := tf32.NewSet()
-			others.Add("x", 256, length)
+			others.Add("x", size, length)
 			x := others.ByName["x"]
 
 			set := tf32.NewSet()
-			set.Add("y", 256, length)
+			set.Add("y", size, length)
 
 			var markov [order]Markov
 			for _, value := range cp {
@@ -849,7 +850,7 @@ func main() {
 
 			y := set.ByName["y"]
 			for ii := range length {
-				yy := y.X[ii*256 : (ii+1)*256]
+				yy := y.X[ii*size : (ii+1)*size]
 				softmax(yy)
 				entropy := 0.0
 				for _, value := range yy {
@@ -888,7 +889,7 @@ func main() {
 		for i := range m {
 			m[i] = make(map[Markov][]uint32)
 		}
-		for i := range results[:64] {
+		for i := range results[:len(results)/2] {
 			markov := [order]Markov{}
 			for _, value := range results[i].String[len(str):] {
 				for ii := range markov {
