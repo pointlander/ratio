@@ -741,7 +741,7 @@ func main() {
 					for range size {
 						x.X = append(x.X, 0)
 					}
-					break
+					continue
 				}
 				for _, value := range distribution {
 					x.X = append(x.X, value)
