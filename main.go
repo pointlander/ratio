@@ -849,15 +849,33 @@ func main() {
 			}
 
 			y := set.ByName["y"]
+			avg := make([]float32, size)
 			for ii := range length {
 				yy := y.X[ii*size : (ii+1)*size]
-				softmax(yy)
-				entropy := 0.0
-				for _, value := range yy {
-					entropy += float64(value) * math.Log2(float64(value))
+				for iii, v := range yy {
+					avg[iii] += v
 				}
-				results[i].Entropy += -entropy
 			}
+			for ii := range avg {
+				avg[ii] /= float32(length)
+			}
+			vari := make([]float32, size)
+			for ii := range length {
+				yy := y.X[ii*size : (ii+1)*size]
+				for iii, v := range yy {
+					diff := avg[iii] - v
+					vari[iii] += diff * diff
+				}
+			}
+			for ii, v := range vari {
+				vari[ii] = float32(math.Sqrt(float64(v / float32(length))))
+			}
+			softmax(vari)
+			entropy := 0.0
+			for _, value := range vari {
+				entropy += float64(value) * math.Log2(float64(value))
+			}
+			results[i].Entropy = -entropy
 			fmt.Println("string", i, results[i].Entropy)
 			done <- true
 		}
