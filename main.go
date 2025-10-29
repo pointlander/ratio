@@ -126,14 +126,15 @@ const (
 	order = 4
 )
 
-type Markov [order]byte
-type Model [order]map[Markov][]uint32
+type markov [order]byte
+type Markov [order]markov
+type Model [order]map[markov][]uint32
 
 // Lookup looks a vector up
-func Lookup(markov *[order]Markov, model *Model) []float32 {
+func (m *Model) Lookup(markov *Markov) []float32 {
 	for i := range markov {
 		i = order - 1 - i
-		vector := model[i][markov[i]]
+		vector := m[i][markov[i]]
 		if vector != nil {
 			sum := float32(0.0)
 			for _, value := range vector {
@@ -150,11 +151,11 @@ func Lookup(markov *[order]Markov, model *Model) []float32 {
 }
 
 // Iterate iterates a markov model
-func Iterate(markov *[order]Markov, state byte) {
-	for i := range markov {
+func (m *Markov) Iterate(state byte) {
+	for i := range m {
 		state := state
-		for ii, value := range markov[i][:i+1] {
-			markov[i][ii], state = state, value
+		for ii, value := range m[i][:i+1] {
+			m[i][ii], state = state, value
 		}
 	}
 }
@@ -370,7 +371,7 @@ func LMMode() {
 		{Name: "all"},
 	}
 	for i := range files[len(files)-1].Model {
-		files[len(files)-1].Model[i] = make(map[Markov][]uint32)
+		files[len(files)-1].Model[i] = make(map[markov][]uint32)
 	}
 
 	load := func(book *File, all *File) {
@@ -386,31 +387,31 @@ func LMMode() {
 			panic(err)
 		}
 
-		markov := [order]Markov{}
+		mark := Markov{}
 		for i := range book.Model {
-			book.Model[i] = make(map[Markov][]uint32)
+			book.Model[i] = make(map[markov][]uint32)
 		}
 		for _, value := range data {
-			for ii := range markov {
-				vector := book.Model[ii][markov[ii]]
+			for ii := range mark {
+				vector := book.Model[ii][mark[ii]]
 				if vector == nil {
 					vector = make([]uint32, size)
 				}
 				vector[value]++
-				book.Model[ii][markov[ii]] = vector
+				book.Model[ii][mark[ii]] = vector
 
 				{
-					vector := all.Model[ii][markov[ii]]
+					vector := all.Model[ii][mark[ii]]
 					if vector == nil {
 						vector = make([]uint32, size)
 					}
 					vector[value]++
-					all.Model[ii][markov[ii]] = vector
+					all.Model[ii][mark[ii]] = vector
 				}
 
 				state := value
-				for iii, value := range markov[ii][:ii+1] {
-					markov[ii][iii], state = state, value
+				for iii, value := range mark[ii][:ii+1] {
+					mark[ii][iii], state = state, value
 				}
 			}
 		}
@@ -444,23 +445,23 @@ func LMMode() {
 			set := tf32.NewSet()
 			set.Add("y", 256, length)
 
-			var markov [order]Markov
+			var markov Markov
 			for _, value := range cp {
-				Iterate(&markov, value)
-				distribution := Lookup(&markov, &files[model].Model)
+				markov.Iterate(value)
+				distribution := files[model].Model.Lookup(&markov)
 				for _, value := range distribution {
 					x.X = append(x.X, value)
 				}
 			}
 			for range step {
-				distribution := Lookup(&markov, &files[model].Model)
+				distribution := files[model].Model.Lookup(&markov)
 				sum, selected := float32(0.0), rng.Float32()
 				for key, value := range distribution {
 					sum += value
 					if selected < sum {
 						cp = append(cp, byte(key))
-						Iterate(&markov, byte(key))
-						distribution := Lookup(&markov, &files[model].Model)
+						markov.Iterate(byte(key))
+						distribution := files[model].Model.Lookup(&markov)
 						for _, value := range distribution {
 							x.X = append(x.X, value)
 						}
@@ -660,7 +661,7 @@ func main() {
 		{Name: "all"},
 	}
 	for i := range files[len(files)-1].Model {
-		files[len(files)-1].Model[i] = make(map[Markov][]uint32)
+		files[len(files)-1].Model[i] = make(map[markov][]uint32)
 	}
 
 	load := func(book *File, all *File) {
@@ -676,31 +677,31 @@ func main() {
 			panic(err)
 		}
 
-		markov := [order]Markov{}
+		mark := Markov{}
 		for i := range book.Model {
-			book.Model[i] = make(map[Markov][]uint32)
+			book.Model[i] = make(map[markov][]uint32)
 		}
 		for _, value := range data {
-			for ii := range markov {
-				vector := book.Model[ii][markov[ii]]
+			for ii := range mark {
+				vector := book.Model[ii][mark[ii]]
 				if vector == nil {
 					vector = make([]uint32, size)
 				}
 				vector[value]++
-				book.Model[ii][markov[ii]] = vector
+				book.Model[ii][mark[ii]] = vector
 
 				{
-					vector := all.Model[ii][markov[ii]]
+					vector := all.Model[ii][mark[ii]]
 					if vector == nil {
 						vector = make([]uint32, size)
 					}
 					vector[value]++
-					all.Model[ii][markov[ii]] = vector
+					all.Model[ii][mark[ii]] = vector
 				}
 
 				state := value
-				for iii, value := range markov[ii][:ii+1] {
-					markov[ii][iii], state = state, value
+				for iii, value := range mark[ii][:ii+1] {
+					mark[ii][iii], state = state, value
 				}
 			}
 		}
@@ -734,10 +735,10 @@ func main() {
 			set := tf32.NewSet()
 			set.Add("y", size, length)
 
-			var markov [order]Markov
+			var markov Markov
 			for _, value := range cp {
-				Iterate(&markov, value)
-				distribution := Lookup(&markov, model)
+				markov.Iterate(value)
+				distribution := model.Lookup(&markov)
 				if distribution == nil {
 					for range size {
 						x.X = append(x.X, 0)
@@ -749,15 +750,15 @@ func main() {
 				}
 			}
 			for range step {
-				distribution := Lookup(&markov, model)
+				distribution := model.Lookup(&markov)
 				sum, selected := float32(0.0), rng.Float32()
 				found := false
 				for key, value := range distribution {
 					sum += value
 					if selected < sum {
 						cp = append(cp, byte(key))
-						Iterate(&markov, byte(key))
-						distribution := Lookup(&markov, model)
+						markov.Iterate(byte(key))
+						distribution := model.Lookup(&markov)
 						for _, value := range distribution {
 							x.X = append(x.X, value)
 						}
@@ -905,10 +906,10 @@ func main() {
 		}*/
 		m := Model{}
 		for i := range m {
-			m[i] = make(map[Markov][]uint32)
+			m[i] = make(map[markov][]uint32)
 		}
 		for i := range results[:len(results)/2] {
-			markov := [order]Markov{}
+			markov := Markov{}
 			for _, value := range results[i].String[len(str):] {
 				for ii := range markov {
 					vector := m[ii][markov[ii]]
