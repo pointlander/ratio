@@ -128,6 +128,8 @@ var (
 	FlagCluster = flag.Bool("c", false, "cluster mode")
 	// FlagLM langauge model mode
 	FlagLM = flag.Bool("lm", false, "language model mode")
+	// FlagGA genetic algorithm language model mode
+	FlagGA = flag.Bool("ga", false, "genetic algorithm language model mode")
 )
 
 // ClusterMode
@@ -550,19 +552,8 @@ func LMMode() {
 	fmt.Println(string(str))
 }
 
-func main() {
-	flag.Parse()
-
-	if *FlagCluster {
-		ClusterMode()
-		return
-	}
-
-	if *FlagLM {
-		LMMode()
-		return
-	}
-
+// GAMode genetic algorithm mode
+func GAMode() {
 	rng := rand.New(rand.NewSource(1))
 
 	const (
@@ -886,5 +877,23 @@ func main() {
 		s, m = process(str, m)
 	}
 	fmt.Println(string(s))
+}
 
+func main() {
+	flag.Parse()
+
+	if *FlagCluster {
+		ClusterMode()
+		return
+	}
+
+	if *FlagLM {
+		LMMode()
+		return
+	}
+
+	if *FlagGA {
+		GAMode()
+		return
+	}
 }
