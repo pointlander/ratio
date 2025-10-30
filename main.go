@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/pointlander/ratio/kmeans"
+	"github.com/pointlander/ratio/order4"
 
 	"github.com/pointlander/gradient/tf32"
 	"github.com/pointlander/gradient/tf64"
@@ -121,44 +122,6 @@ func Load() []Fisher {
 
 //go:embed books/*
 var Text embed.FS
-
-const (
-	order = 4
-)
-
-type markov [order]byte
-type Markov [order]markov
-type Model [order]map[markov][]uint32
-
-// Lookup looks a vector up
-func (m *Model) Lookup(markov *Markov) []float32 {
-	for i := range markov {
-		i = order - 1 - i
-		vector := m[i][markov[i]]
-		if vector != nil {
-			sum := float32(0.0)
-			for _, value := range vector {
-				sum += float32(value)
-			}
-			result := make([]float32, len(vector))
-			for ii, value := range vector {
-				result[ii] = float32(value) / sum
-			}
-			return result
-		}
-	}
-	return nil
-}
-
-// Iterate iterates a markov model
-func (m *Markov) Iterate(state byte) {
-	for i := range m {
-		state := state
-		for ii, value := range m[i][:i+1] {
-			m[i][ii], state = state, value
-		}
-	}
-}
 
 var (
 	// FlagCluster cluster mode
@@ -356,7 +319,7 @@ func LMMode() {
 	type File struct {
 		Name  string
 		Data  []byte
-		Model Model
+		Model order4.Model
 	}
 
 	files := []File{
@@ -370,9 +333,7 @@ func LMMode() {
 		{Name: "3176.txt.utf-8.bz2"},
 		{Name: "all"},
 	}
-	for i := range files[len(files)-1].Model {
-		files[len(files)-1].Model[i] = make(map[markov][]uint32)
-	}
+	files[len(files)-1].Model.Init()
 
 	load := func(book *File, all *File) {
 		path := fmt.Sprintf("books/%s", book.Name)
@@ -387,10 +348,8 @@ func LMMode() {
 			panic(err)
 		}
 
-		mark := Markov{}
-		for i := range book.Model {
-			book.Model[i] = make(map[markov][]uint32)
-		}
+		mark := order4.Markov{}
+		book.Model.Init()
 		for _, value := range data {
 			for ii := range mark {
 				vector := book.Model[ii][mark[ii]]
@@ -445,7 +404,7 @@ func LMMode() {
 			set := tf32.NewSet()
 			set.Add("y", 256, length)
 
-			var markov Markov
+			var markov order4.Markov
 			for _, value := range cp {
 				markov.Iterate(value)
 				distribution := files[model].Model.Lookup(&markov)
@@ -646,7 +605,7 @@ func main() {
 	type File struct {
 		Name  string
 		Data  []byte
-		Model Model
+		Model order4.Model
 	}
 
 	files := []File{
@@ -660,9 +619,7 @@ func main() {
 		{Name: "3176.txt.utf-8.bz2"},
 		{Name: "all"},
 	}
-	for i := range files[len(files)-1].Model {
-		files[len(files)-1].Model[i] = make(map[markov][]uint32)
-	}
+	files[len(files)-1].Model.Init()
 
 	load := func(book *File, all *File) {
 		path := fmt.Sprintf("books/%s", book.Name)
@@ -677,10 +634,8 @@ func main() {
 			panic(err)
 		}
 
-		mark := Markov{}
-		for i := range book.Model {
-			book.Model[i] = make(map[markov][]uint32)
-		}
+		mark := order4.Markov{}
+		book.Model.Init()
 		for _, value := range data {
 			for ii := range mark {
 				vector := book.Model[ii][mark[ii]]
@@ -716,7 +671,7 @@ func main() {
 	}
 
 	str := []byte("What is the meaning of life?")
-	process := func(str []byte, model *Model) ([]byte, *Model) {
+	process := func(str []byte, model *order4.Model) ([]byte, *order4.Model) {
 		type String struct {
 			String  []byte
 			Entropy float64
@@ -735,7 +690,7 @@ func main() {
 			set := tf32.NewSet()
 			set.Add("y", size, length)
 
-			var markov Markov
+			var markov order4.Markov
 			for _, value := range cp {
 				markov.Iterate(value)
 				distribution := model.Lookup(&markov)
@@ -904,12 +859,10 @@ func main() {
 		/*for i := range results {
 			fmt.Println(results[i].Entropy, results[i].String)
 		}*/
-		m := Model{}
-		for i := range m {
-			m[i] = make(map[markov][]uint32)
-		}
+		m := order4.Model{}
+		m.Init()
 		for i := range results[:len(results)/2] {
-			markov := Markov{}
+			markov := order4.Markov{}
 			for _, value := range results[i].String[len(str):] {
 				for ii := range markov {
 					vector := m[ii][markov[ii]]
