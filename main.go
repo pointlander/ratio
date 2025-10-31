@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/pointlander/ratio/kmeans"
-	"github.com/pointlander/ratio/order16"
+	order "github.com/pointlander/ratio/order24"
 	"github.com/pointlander/ratio/order4"
 
 	"github.com/pointlander/gradient/tf32"
@@ -939,7 +939,7 @@ func main() {
 	type File struct {
 		Name  string
 		Data  []byte
-		Model order16.Model
+		Model order.Model
 	}
 
 	files := []File{
@@ -974,7 +974,7 @@ func main() {
 			}
 		}
 
-		mark := order16.Markov{}
+		mark := order.Markov{}
 		book.Model.Init()
 		for _, value := range data {
 			for ii := range mark {
@@ -1011,7 +1011,7 @@ func main() {
 	}
 
 	str := []byte("What is the meaning of life?")
-	process := func(str []byte, model *order16.Model) ([]byte, *order16.Model) {
+	process := func(str []byte, model *order.Model) ([]byte, *order.Model) {
 		type String struct {
 			String  []byte
 			Entropy float64
@@ -1034,7 +1034,7 @@ func main() {
 			set := tf32.NewSet()
 			set.Add("y", size, length)
 
-			var markov order16.Markov
+			var markov order.Markov
 			for _, value := range cp {
 				markov.Iterate(value)
 				distribution := model.Lookup(&markov)
@@ -1203,10 +1203,10 @@ func main() {
 		/*for i := range results {
 			fmt.Println(results[i].Entropy, results[i].String)
 		}*/
-		m := order16.Model{}
+		m := order.Model{}
 		m.Init()
 		for i := range results[:len(results)/2] {
-			markov := order16.Markov{}
+			markov := order.Markov{}
 			for _, value := range results[i].String[len(str):] {
 				for ii := range markov {
 					vector := m[ii][markov[ii]]
