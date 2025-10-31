@@ -572,12 +572,12 @@ func GAMode() {
 
 	softmax := func(values []float32) {
 		max := float32(0.0)
-		for i, v := range values {
+		/*for i, v := range values {
 			if v < 0 {
 				v = -v
 			}
 			values[i] = v
-		}
+		}*/
 		for _, v := range values {
 			if v > max {
 				max = v
@@ -914,12 +914,12 @@ func main() {
 
 	softmax := func(values []float32) {
 		max := float32(0.0)
-		for i, v := range values {
+		/*for i, v := range values {
 			if v < 0 {
 				v = -v
 			}
 			values[i] = v
-		}
+		}*/
 		for _, v := range values {
 			if v > max {
 				max = v
