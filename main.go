@@ -901,10 +901,10 @@ func main() {
 
 	const (
 		size       = 2
-		step       = 256
+		step       = 1024
 		model      = 8
 		Eta        = 1.0e-2
-		population = 128
+		population = 256
 	)
 
 	const (
@@ -978,12 +978,12 @@ func main() {
 		book.Model.Init()
 		for _, value := range data {
 			for ii := range mark {
-				vector := book.Model[ii][mark[ii]]
+				/*vector := book.Model[ii][mark[ii]]
 				if vector == nil {
 					vector = make([]uint32, size)
 				}
 				vector[value]++
-				book.Model[ii][mark[ii]] = vector
+				book.Model[ii][mark[ii]] = vector*/
 
 				{
 					vector := all.Model[ii][mark[ii]]
@@ -1100,7 +1100,7 @@ func main() {
 			l1 := tf32.T(tf32.Mul(tf32.Dropout(tf32.Mul(sum, sum), dropout), tf32.T(sum)))
 			loss := tf32.Avg(tf32.Quadratic(l1, set.Get("y")))
 
-			for iteration := range 128 {
+			for iteration := range 8 {
 				pow := func(x float64) float64 {
 					y := math.Pow(x, float64(iteration+1))
 					if math.IsNaN(y) || math.IsInf(y, 0) {
