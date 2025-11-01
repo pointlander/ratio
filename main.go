@@ -901,7 +901,7 @@ func main() {
 
 	const (
 		size       = 2
-		step       = 128
+		step       = 256
 		model      = 8
 		Eta        = 1.0e-2
 		population = 128
