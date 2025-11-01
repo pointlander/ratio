@@ -1207,7 +1207,7 @@ func main() {
 		m.Init()
 		for i := range results[:len(results)/2] {
 			markov := order.Markov{}
-			for _, value := range results[i].String[len(str):] {
+			for _, value := range results[i].String {
 				for ii := range markov {
 					vector := m[ii][markov[ii]]
 					if vector == nil {
